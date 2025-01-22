@@ -8,13 +8,6 @@ __pycache__/
 # Archivos de entorno virtual
 venv/
 
-# Archivos sensibles
-.env
-
-# Archivos de salida o datos temporales
-data/raw/
-output/
-
 # Archivos innecesarios de Git
 *.log
 *.DS_Store
