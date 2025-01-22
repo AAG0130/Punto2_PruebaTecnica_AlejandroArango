@@ -1,0 +1,20 @@
+# Ignorar cachés de Python
+__pycache__/
+*.pyc
+
+# Configuración de Visual Studio Code
+.vscode/
+
+# Archivos de entorno virtual
+venv/
+
+# Archivos sensibles
+.env
+
+# Archivos de salida o datos temporales
+data/raw/
+output/
+
+# Archivos innecesarios de Git
+*.log
+*.DS_Store
