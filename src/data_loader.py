@@ -1,6 +1,9 @@
 import os
 import pandas as pd
 from dotenv import load_dotenv
+import ast  # Para evaluar cadenas con listas como Python objects
+from typing import Tuple
+
 
 class DataLoader:
     """
@@ -46,7 +49,25 @@ class DataLoader:
             print(f"Error al cargar los datos: {e}")
             return {}
 
-    def process_data(self, data: dict) -> pd.DataFrame:
+    @staticmethod
+    def clean_column(value):
+        """
+        Limpia y une valores de una columna que contienen listas en formato string.
+
+        Args:
+            value (str): Valor de la columna.
+
+        Returns:
+            str: Cadena limpia con valores unidos por comas.
+        """
+        try:
+            # Convierte la cadena como lista y une sus elementos
+            return ", ".join(ast.literal_eval(value))
+        except (ValueError, SyntaxError):
+            # Si falla, devuelve el valor original o NaN
+            return value
+
+    def process_data(self, data: dict) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Procesa los datos combinando ambos DataFrames, limpiando columnas y eliminando duplicados y nulos.
 
@@ -54,13 +75,17 @@ class DataLoader:
             data (dict): Diccionario con los DataFrames cargados.
 
         Returns:
-            pd.DataFrame: DataFrame combinado y limpio.
+            Tuple[pd.DataFrame, pd.DataFrame]: DataFrame combinado y limpio, y DataFrame con registros no coincidentes.
         """
         try:
             # Reducir columnas antes del merge
             print("Filtrando columnas necesarias en DataFrames originales...")
             data["books_data"] = data["books_data"][["Title", "authors", "categories", "ratingsCount"]]
             data["books_rating"] = data["books_rating"][["Title", "review/score", "review/text"]]
+
+            # Identificar registros no coincidentes
+            print("Identificando registros no coincidentes...")
+            unmatched_ratings = data["books_rating"][~data["books_rating"]["Title"].isin(data["books_data"]["Title"])]
 
             # Unir ambos DataFrames por la columna "Title"
             print("Uniendo DataFrames por la columna 'Title'...")
@@ -71,17 +96,40 @@ class DataLoader:
                 how="inner"
             )
 
-            # Eliminar duplicados y nulos del DataFrame combinado
-            print("Eliminando duplicados y valores nulos del DataFrame combinado...")
-            merged_df = merged_df.drop_duplicates().dropna()
-
-            # Limpiar columnas específicas
+            # Limpiar columnas específicas con la función optimizada
             print("Limpiando columnas 'authors' y 'categories'...")
-            for col in ['authors', 'categories']:
-                merged_df[col] = merged_df[col].str.extract(r"'(.*?)'")
+            merged_df["authors"] = merged_df["authors"].apply(self.clean_column)
+            merged_df["categories"] = merged_df["categories"].apply(self.clean_column)
+
+            # Eliminar registros con "review/text" vacío o NaN
+            print("Eliminando registros con 'review/text' vacío o NaN...")
+            merged_df = merged_df[~merged_df["review/text"].isnull() & (merged_df["review/text"] != "")]
+
+            # Eliminar duplicados
+            print("Eliminando duplicados...")
+            merged_df = merged_df.drop_duplicates()
 
             print("Procesamiento completado.")
-            return merged_df
+            return merged_df, unmatched_ratings
         except Exception as e:
             print(f"Error al procesar los datos: {e}")
-            return pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame()
+
+
+if __name__ == "__main__":
+    # Inicializar el cargador de datos
+    loader = DataLoader()
+
+    # Cargar los datos
+    data = loader.load_data()
+    if data:
+        # Procesar los datos
+        processed_data, unmatched_data = loader.process_data(data)
+
+        # Verificar los resultados
+        print(f"DataFrame procesado:\n{processed_data.head()}")
+        print(f"Número total de registros: {len(processed_data)}")
+
+        # Mostrar los registros no coincidentes
+        print(f"Registros no coincidentes en 'books_rating':\n{unmatched_data}")
+        print(f"Número total de registros no coincidentes: {len(unmatched_data)}")
